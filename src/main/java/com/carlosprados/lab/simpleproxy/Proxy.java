@@ -1,34 +1,68 @@
 package com.carlosprados.lab.simpleproxy;
 
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class Proxy {
 
-    public static final String usageArgs = " <localport> <host> <port> <timeout_ms>";
+    public static final String usageArgs = " <localaddress> <localport> <host> <port> <timeout_ms>";
 
-    static int clientCount;
+    static Proxy proxy;
+    static ConnectionCollection connectionCollection;
+    static ProxyManager proxyManager;
+    static SimpleDateFormat dateFormatter = new SimpleDateFormat("HH:mm:ss,SSS");
+    
+    static String localHost;
+    static int localport;
+    static String remoteHost;
+    static int remotePort;
+    static int timeout = 30000;
 
     public static synchronized void display(String s) {
-        System.err.println(s);
+        StringBuilder sb = new StringBuilder("[");
+        sb.append(dateFormatter.format(new Date())).append("]").append(s);
+        System.out.println(sb.toString());
     }
 
     public static void main(String[] _argv) {
-        Proxy proxy = new Proxy();
+        proxy = new Proxy();
 
-        if (_argv.length >= 3) {
-            int localport = Integer.parseInt(_argv[0]);
-            String remoteHost = _argv[1];
-            int remotePort = Integer.parseInt(_argv[2]);
-            int timeout = 30000;
+        if (_argv.length >= 4) {
+            localHost = _argv[0];
+            localport = Integer.parseInt(_argv[1]);
+            remoteHost = _argv[2];
+            remotePort = Integer.parseInt(_argv[3]);
             try {
-                timeout = Integer.parseInt(_argv[3]);
+                timeout = Integer.parseInt(_argv[4]);
             } catch (Exception e) {
             }
-            proxy.run(localport, remoteHost, remotePort, timeout);
+
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                @Override
+                public void run() {
+                    Proxy.display("Quitting application");
+                    if (proxyManager != null) {
+                        proxyManager.quit();
+                    }
+                }
+            });
+            Thread mainTh = new Thread() {
+                @Override
+                public void run() {
+                    connectionCollection = new ConnectionCollection(remoteHost, remotePort, timeout, 200);
+                    proxyManager = new ProxyManager("proxySchedule.csv", connectionCollection, localHost, localport);
+                    proxyManager.work();
+                }
+            };
+            mainTh.start();
+            consoleOptions();
+
         } else {
             System.err.println("usage: java " + proxy.getClass().getName() + usageArgs);
         }
+
+        Proxy.display("App exited");
     }
 
     public static synchronized void print(int _integer) {
@@ -39,36 +73,30 @@ public class Proxy {
         System.out.println(_string);
     }
 
-    public static synchronized void quit(long t) {
-        display("...quit after waiting " + t + " ms");
-        clientCount--;
+    public static void quitConnexion(long id) {
+        Proxy.display("quitting connexion " + id);
+        connectionCollection.closeProxyConnection(id);
     }
 
-    public void run(int _localport, String _host, int _port, long _timeout) {
+    public static void consoleOptions() {
+        // >>EXPERIMENTAL
+        boolean running = true;
         try {
-            ServerSocket server = new ServerSocket(_localport);
-            while (true) {
-                Socket socket = null;
-                try {
-                    display("listening...");
-                    socket = server.accept();
-                    if (socket != null) {
-                        clientCount++;
-                        display("accepted as #" + clientCount + ":" + socket);
-                        ProxyConnection proxyConnection = new ProxyConnection(socket, _host, _port, _timeout);
-                        proxyConnection.start();
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace(System.err);
+            while (running) {
+                System.out.println("press 'r' to reset, 'q' to exit");
+                int key;
+                key = System.in.read();
+                if (key == 'r') {
+                    proxyManager.resetSchedule();
+                } else if (key == 'q') {
+                    proxyManager.quit();
+                    running = false;
                 }
-                /*
-                 * try { cSocket.close(); } catch (Exception e) { // fall thru }
-                 */
             }
-        } catch (Throwable t) {
-            t.printStackTrace(System.err);
+        } catch (IOException e) {
+            System.err.println("Error in consoleOptions: " + e.getMessage());
         }
+        // <<EXPERIMENTAL
     }
-
 }// class
 

@@ -3,11 +3,62 @@ Welcome to the simple-proxy wiki!
 
 This project aims to be a very simple TCP proxy.
 
+It can support multiple connections (max. 200) at any given time. This proxy has a scheduler to change over time the behaviour of all the connections (see bellow proxySchedule.csv) and a a very limited set of command line options (see below) to control thee schedule on execution.
+
 It has been used in real scenarios for DevOps and IT engineers in order
 to reach production servers through an intermediate machine.
 
+== Usage ==
 The usage is very simple:
-java -cp simple-proxy-1.0-SNAPSHOT.jar com.carlosprados.lab.simpleproxy.Proxy <localport> <host> <port> <timeout_ms>
+java -cp simple-proxy-1.0-SNAPSHOT.jar com.carlosprados.lab.simpleproxy.Proxy <localhost> <localport> <host> <port>
 
-You can buil it using Maven
+timeout_ms is not used any more
+
+You can build it using Maven
 charlie@dune:$ mvn clean package
+
+Besides the program arguments the proxy behavior can be controlled through the proxySchedule.csv file and the command line options. They both are followed explained:
+
+-- proxySchedule.csv --
+
+This file stores the proxy communication schedule so it is possible to emulate some ususally unwanted situations as the lost of the connections, the delay in the communications or the lost of frames (or at least of part of then).
+
+The file follows the csv format though is possible to comment whole line preceding then by '#' character.
+
+The csv fields are from left to right:
+Operating time: Time in seconds during which the configuration is applied
+Connection status: Can be c or d. c means that the connections are keep and d that de connections are closead and does not creates any more.
+Service behaviour (optional): Can be p, d or r. Refers to the connexion stablishment behaviour; p means proper behaviour, d means that the connection is not stabished but there is no warning at all and r is like d but the connection is openly rejected.
+Delay (optional): Added delay in ms to the transmition
+Transfer faults rate (optional): Probability over 1000 for the lost of data in the transmition.
+
+-- commad line options --
+
+To issue a command just press the key command (see bellow) and thern return key.
+
+Key commands:
+
+'r': resets the scheduler program. In other words if the proxy is executing the csv line n and is issued de 'r' key command it inmediately executes the first line of the csv file and follows from that on.
+'q': closes the application (same as ctrl+c).
+
+== SW structure == 
+
+Proxy: Main class creates ConnectionCollection and ProxyManager singleton objects then calls the ProxyManager method work().
+
+ProxyManager: Controls the proxy behaviour. Its main method work() reads sequentially in order the proxySchedule.csv lines modifies the comunnications configuration and sleep until it is time for reading another line.
+
+ConnectionCollection: Singleton that creates, closes and contains of all ProxyConnection objects.
+
+ServiceConnection: An active object (extends Thread) attached to ProxyManager that handles the socket connection process. This means: Keeps the listening socket and calls ConnectionCollection to create a new ProxyConnection when acceps a new client socket connection.
+
+ProxyConnection: Represents a tcp connection between the client socket application and the server socket application. To do so it mantains two ConnectionStream objects one for each direction in the communicarion (toClientStream for data tranfer from server to client and toServerStream for data tranfer from client to server.
+
+ConnectionStream: Active object attached to every ProxyConnection that keeps the tcp communication in one direction (server to client or client to server) 
+
+== bugs reported ==
+- Some times when updated the schedule status not all the connections are informed.
+
+== changes to come == 
+- Enable some kind of profesional trace logs.
+
+- Maybe prepare some optinal strategy to meddle with the bytes in the transfered message.
