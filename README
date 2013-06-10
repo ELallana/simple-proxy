@@ -62,3 +62,8 @@ ConnectionStream: Active object attached to every ProxyConnection that keeps the
 - Enable some kind of profesional trace logs.
 
 - Maybe prepare some optinal strategy to meddle with the bytes in the transfered message.
+
+
+== Versions ==
+
+v1.0.0: Current version
